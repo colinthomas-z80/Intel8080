@@ -1,4 +1,4 @@
 # Intel8080
 Intel 8080 Emulation with Space Invaders
 
-As of now I need to write the machine. Hopefully independent from the processor so I can use it elsewhere. 
+Trying to keep 8080 abstracted from space invader. As to reuse. Using SDL for video and input
