@@ -1,7 +1,12 @@
 /*
 	Disassembles 8080 bytecode.
-Parameters are the unsigned char 'buffer' which the file should be loaded into, and pc, which should be incremented 
+Parameters are ((the unsigned char 'buffer' which the file should be loaded into**)), and pc, which should be incremented 
 outside the function.
+
+Edit. When I had it the way first described it would think it was one ahead of the interpreter switch statement.
+Instead of putting the opcode variable in this function call, I just indexed the memory again state->memory[pc]. I
+will need to return to figure out why that happened.
+
 
 */
 

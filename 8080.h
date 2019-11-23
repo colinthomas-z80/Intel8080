@@ -1,47 +1,50 @@
 /*
-	This should be my Intel 8080 Emulator. This was largely inspired by the 8080 emulator located at
-	emulator101.com. I intend for this to be a more readable C++. 
+This should be my Intel 8080 Emulator. This was largely inspired by the 8080 emulator located at
+emulator101.com. I intend for this to be a more readable C++.
 */
 #include <stdio.h>
 #include <stdint.h>
 #include <fstream>
 #include <math.h>
 #include <Windows.h> // For debugging purposes
+#include <SDL.h>
 using namespace std;
 
 #include "Disassembler.h"
+#include "machine.h"
+#include "projWindow.h"
 
 class flags
 {
-	public:
-		uint8_t z:1;
-		uint8_t s:1;
-		uint8_t p:1;
-		uint8_t cy:1;
-		uint8_t ac:1;
-		uint8_t pad:3;
+public:
+	uint8_t z : 1;
+	uint8_t s : 1;
+	uint8_t p : 1;
+	uint8_t cy : 1;
+	uint8_t ac : 1;
+	uint8_t pad : 3;
 };
 
 class reg
 {
-	public:
-		uint8_t a;
-		uint8_t b;
-		uint8_t c;
-		uint8_t d;
-		uint8_t e;
-		uint8_t h;
-		uint8_t l;
-		uint16_t sp;
-		uint16_t pc;
-		uint8_t *memory;
-		flags flags;
-		uint8_t int_enable;
+public:
+	uint8_t a;
+	uint8_t b;
+	uint8_t c;
+	uint8_t d;
+	uint8_t e;
+	uint8_t h;
+	uint8_t l;
+	uint16_t sp;
+	uint16_t pc;
+	uint8_t *memory;
+	flags flags;
+	uint8_t int_enable;
 };
 
 int parity(int x, int size)
 {
-	if(x << (size - 1) == 1)
+	if (x << (size - 1) == 1)
 	{
 		return 0;
 	}
@@ -78,12 +81,12 @@ void ArithFlagsA(reg *state, uint16_t res)
 
 
 int emulate(reg* state)
-{	
+{
 	unsigned char *opcode = &state->memory[state->pc]; // our new "buffer" which we will load in our program
-	printf("%04x: %02x:  ",state->pc,*opcode);
+	printf("%04x: %02x:  %02x: %02x: ", state->pc, *opcode, state->a,(state->h << 8) | state->l);
 	disassemble(&state->memory[state->pc], state->pc);
 	state->pc++;
-	switch(*opcode)
+	switch (*opcode)
 	{
 	case 0x00: break;	//NOP
 	case 0x01: 							//LXI	B,word
@@ -91,7 +94,7 @@ int emulate(reg* state)
 		state->b = opcode[2];
 		state->pc += 2;
 		break;
-	
+
 	case 0x05: 							//DCR    B
 	{
 		uint8_t res = state->b - 1;
@@ -105,7 +108,7 @@ int emulate(reg* state)
 		state->b = opcode[1];
 		state->pc++;
 		break;
-	
+
 	case 0x09: 							//DAD B
 	{
 		uint32_t hl = (state->h << 8) | state->l;
@@ -116,7 +119,7 @@ int emulate(reg* state)
 		state->flags.cy = ((res & 0xffff0000) > 0);
 	}
 	break;
-	
+
 	case 0x0d: 							//DCR    C
 	{
 		uint8_t res = state->c - 1;
@@ -137,13 +140,13 @@ int emulate(reg* state)
 		state->flags.cy = (1 == (x & 1));
 	}
 	break;
-	
+
 	case 0x11: 							//LXI	D,word
 		state->e = opcode[1];
 		state->d = opcode[2];
 		state->pc += 2;
 		break;
-	
+
 	case 0x13: 							//INX    D
 		state->e++;
 		if (state->e == 0)
@@ -166,24 +169,24 @@ int emulate(reg* state)
 		state->a = state->memory[offset];
 	}
 	break;
-	
+
 	case 0x21: 							//LXI	H,word
 		state->l = opcode[1];
 		state->h = opcode[2];
 		state->pc += 2;
 		break;
-	
+
 	case 0x23: 							//INX    H
 		state->l++;
 		if (state->l == 0)
 			state->h++;
 		break;
-	
+
 	case 0x26:  							//MVI H,byte
 		state->h = opcode[1];
 		state->pc++;
 		break;
-	
+
 	case 0x29: 								//DAD    H
 	{
 		uint32_t hl = (state->h << 8) | state->l;
@@ -193,7 +196,7 @@ int emulate(reg* state)
 		state->flags.cy = ((res & 0xffff0000) != 0);
 	}
 	break;
-	
+
 	case 0x31: 							//LXI	SP,word
 		state->sp = (opcode[2] << 8) | opcode[1];
 		state->pc += 2;
@@ -205,7 +208,7 @@ int emulate(reg* state)
 		state->pc += 2;
 	}
 	break;
-	
+
 	case 0x36: 							//MVI	M,byte
 	{
 		//AC set if lower nibble of h was zero prior to dec
@@ -214,7 +217,7 @@ int emulate(reg* state)
 		state->pc++;
 	}
 	break;
-	
+
 	case 0x3a: 							//LDA    (word)
 	{
 		uint16_t offset = (opcode[2] << 8) | (opcode[1]);
@@ -222,19 +225,19 @@ int emulate(reg* state)
 		state->pc += 2;
 	}
 	break;
-	
+
 	case 0x3e: 							//MVI    A,byte
 		state->a = opcode[1];
 		state->pc++;
 		break;
-	
+
 	case 0x56: 							//MOV D,M
 	{
 		uint16_t offset = (state->h << 8) | (state->l);
 		state->d = state->memory[offset];
 	}
 	break;
-	
+
 	case 0x5e: 							//MOV E,M
 	{
 		uint16_t offset = (state->h << 8) | (state->l);
@@ -250,7 +253,7 @@ int emulate(reg* state)
 	break;
 
 	case 0x6f: state->l = state->a; break; //MOV L,A
-	
+
 	case 0x77: 							//MOV    M,A
 	{
 		uint16_t offset = (state->h << 8) | (state->l);
@@ -261,16 +264,16 @@ int emulate(reg* state)
 	case 0x7a: state->a = state->d;  break;	//MOV D,A
 	case 0x7b: state->a = state->e;  break;	//MOV E,A
 	case 0x7c: state->a = state->h;  break;	//MOV H,A
-	
+
 	case 0x7e: 							//MOV A,M
 	{
 		uint16_t offset = (state->h << 8) | (state->l);
 		state->a = state->memory[offset];
 	}
 	break;
-	
+
 	case 0xa7: state->a = state->a & state->a; LogicFlagsA(state);	break; //ANA A
-	
+
 	case 0xaf: state->a = state->a ^ state->a; LogicFlagsA(state);	break; //XRA A
 
 	case 0xc1: 						//POP    B
@@ -289,7 +292,7 @@ int emulate(reg* state)
 	case 0xc3:						//JMP address
 		state->pc = (opcode[2] << 8) | opcode[1];
 		break;
-	
+
 	case 0xc5: 						//PUSH   B
 	{
 		state->memory[state->sp - 1] = state->b;
@@ -331,13 +334,13 @@ int emulate(reg* state)
 		state->sp += 2;
 	}
 	break;
-	
+
 	case 0xd3:
 		//Don't know what to do here (yet)
 		state->pc++;
 		break;
 
-	
+
 	case 0xd5: 						//PUSH   D
 	{
 		state->memory[state->sp - 1] = state->d;
@@ -345,7 +348,7 @@ int emulate(reg* state)
 		state->sp = state->sp - 2;
 	}
 	break;
-	
+
 	case 0xe1: 					//POP    H
 	{
 		state->l = state->memory[state->sp];
@@ -368,7 +371,7 @@ int emulate(reg* state)
 		state->pc++;
 	}
 	break;
-	
+
 	case 0xeb: 					//XCHG
 	{
 		uint8_t save1 = state->d;
@@ -392,7 +395,7 @@ int emulate(reg* state)
 		state->sp += 2;
 	}
 	break;
-	
+
 	case 0xf5: 						//PUSH   PSW
 	{
 		state->memory[state->sp - 1] = state->a;
@@ -405,7 +408,7 @@ int emulate(reg* state)
 		state->sp = state->sp - 2;
 	}
 	break;
-	
+
 	case 0xfb: state->int_enable = 1;  break;	//EI
 
 	case 0xfe: 						//CPI  byte
@@ -418,7 +421,7 @@ int emulate(reg* state)
 		state->pc++;
 	}
 	break;
-	
+
 	}
 	/*
 	printf("\t");
@@ -427,34 +430,35 @@ int emulate(reg* state)
 	printf("%c", state->flags.p ? 'p' : '.');
 	printf("%c", state->flags.cy ? 'c' : '.');
 	printf("%c  ", state->flags.ac ? 'a' : '.');
-	//printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x PC %02x\n", state->a, 
-	*/	
-		//state->b, state->c, state->d, state->e, state->h, state->l, state->sp, state->pc);
+	//printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x PC %02x\n", state->a,
+	*/
+	//state->b, state->c, state->d, state->e, state->h, state->l, state->sp, state->pc);
+	
 	printf("\n");
 	return 0;
 }
-	
+
 
 void loadmem(reg* state, const char* file, uint32_t offset)
 {
 	FILE *a;
 	fopen_s(&a, file, "r");  // Get file which contains bytecode
 	if (!a) printf("Could not open bytecode file!");
-	
-	FILE *z;
+
+
 
 
 	fseek(a, 0L, SEEK_END);
 	int fsize = ftell(a); // Get file size by placing cursos at the end. Set it back to the beginning.
 	fseek(a, 0L, SEEK_SET);
-	
+
 
 	unsigned char *buffer = &state->memory[offset];    // Create unsigned char buffer of file size
 	fread(buffer, fsize, 1, a);
-	
-	
+
+
 	fclose(a);
-	
+
 }
 
 reg* init()
@@ -465,23 +469,8 @@ reg* init()
 }
 
 
-int main()
+void interrupt(reg *state, int interrupt_num)
 {
-	reg* state = init();
-	const char* file1 = "invaders.txt";
-	loadmem(state,file1,0);
 
-	
-	state->pc = 0;
-	
-	
-	while(1) 
-	{
-		
-		emulate(state);
-		
-		//while(GetAsyncKeyState(VK_UP));
-		//while (!GetAsyncKeyState(VK_UP));
-	}
-	
 }
+
