@@ -1,72 +1,53 @@
 #include "8080.h"
+#include <chrono>
 
+chrono::high_resolution_clock Clock;
 
 int main(int argc, char* argv[])
 {
-	sdlHandle();
+	sdlInit();
 	SDL_Event e;
 	bool quit = false;
-
 	reg* state = init();
-	const char* file1 = "invaders.txt";
-	loadmem(state, file1, 0);
 	state->pc = 0;
 	
-	
+	auto lastInterrupt = Clock.now();
+	int interruptnum = 1;
+
 
 	while (!quit)
 	{
-		emulate(state);
-		uint16_t mem = 0x2400;
-		uint8_t *byte = &state->memory[mem];
-		int it = 8;
-		SDL_FreeSurface(screenSurface);
-
-		for(int x = 0; x <= screenWidth; x++)
+		auto time = Clock.now();
+		if(chrono::duration_cast<chrono::seconds>(time - lastInterrupt).count() > 5)
 		{
-			
-			for(int y = 0; y <= screenHeight; y++)
+			if(state->int_enable)
 			{
-				if(*byte & (1 << (it-1)) == (1 << (it-1)))
-				{
-					SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-					SDL_RenderDrawPoint(renderer, x, y);
-				}
-				else
-				{
-					SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-					SDL_RenderDrawPoint(renderer, x, y);
-				}
+				lastInterrupt = Clock.now();
+				SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+				SDL_RenderClear(renderer);
+				interrupt(state,interruptnum);
 				
-				
-				
-				it--;
-				if(it == 0)
+				if(interruptnum == 2)
 				{
-					mem++;
-					it = 8;
+					interruptnum-=2;
 				}
+				interruptnum++;
+				
 			}
 		}
-		SDL_RenderPresent(renderer);
-		
-		
-		
-		
-		
-		
-		
-		while (SDL_PollEvent(&e) != 0)
+		emulate(state);
+		while(SDL_PollEvent(&e) > 0)
 		{
-			if (e.type == SDL_QUIT)
+			if(e.type == SDL_QUIT)
 			{
 				quit = true;
 			}
 		}
 	}
 	return 1;
-
 }
+
+
 
 /*
 SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);

@@ -11,7 +11,7 @@ emulator101.com. I intend for this to be a more readable C++.
 using namespace std;
 
 #include "Disassembler.h"
-#include "machine.h"
+
 #include "projWindow.h"
 
 class flags
@@ -465,12 +465,135 @@ reg* init()
 {
 	reg* state = new reg;
 	state->memory = new uint8_t[0x10000];
+	loadmem(state, "invaders.txt",0);
 	return state;
 }
 
 
-void interrupt(reg *state, int interrupt_num)
+int push (reg *state, uint8_t high, uint8_t low)
 {
+	state->memory[state->sp-1] = high;
+	state->memory[state->sp-2] = low;
+	state->sp -= 2;
+	return 1;
+}
+
+void RenderTop(uint8_t *framebuffer) {
+	int y = 0;
+
+	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+	for (int i = 32; i > 16; --i) {
+		for (int bit = 7; bit >= 0; --bit) {
+			int x = 0;
+
+			for (int j = 0; j <= 223; ++j) {
+				int index = i + (j * 32 - 1);
+
+				if (framebuffer[index] & (1 << bit)) {
+					SDL_RenderDrawPoint(renderer, x, y);
+				}
+
+				x++;
+			}
+
+			y++;
+		}
+	}
+	SDL_RenderPresent(renderer);
+}
+
+void RenderBottom(uint8_t* framebuffer) {
+	int y = screenHeight / 2;
+
+	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+	for (int i = 16; i >= 0; --i) {
+		for (int bit = 7; bit >= 0; --bit) {
+			int x = 0;
+
+			for (int j = 0; j <= 223; ++j) {
+				int index = i + (j * 32 - 1);
+
+				if (framebuffer[index] & (1 << bit)) {
+					SDL_RenderDrawPoint(renderer, x, y);
+				}
+
+				x++;
+			}
+
+			y++;
+		}
+	}
+	SDL_RenderPresent(renderer);
 
 }
+
+int interrupt(reg *state, int interrupt_num)
+{
+	push(state, (state->pc & 0xFF00) >> 8, (state->pc & 0xFF));
+	uint8_t *framebuffer = &state->memory[0x2400];
+	if(interrupt_num == 1)
+	{
+		RenderTop(framebuffer);	
+	}
+	else if(interrupt_num == 2)
+	{
+		RenderBottom(framebuffer);
+	}
+	state->pc = 8 * interrupt_num;
+
+	//state->int_enable = 0;
+	return 1;
+}
+/*
+int drawScreen(reg *state)
+{
+	uint8_t b = state->memory[0x2400];
+	uint32_t *f = new uint32_t[0xFFFF];
+	
+	for(int i = 0; i < (64*32); i++)
+	{
+		if (b & 0x80) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		if (b & 0x40) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		if (b & 0x20) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		if (b & 0x10) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		if (b & 0x08) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		if (b & 0x04) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		if (b & 0x02) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		if (b & 0x01) f[i] = 0xFFF; else f[i] = 0x000;
+		i++;
+		b++;
+	}
+	
+	uint32_t *pixels = (uint32_t *)screen->pixels;
+	int i = 0;
+	for(int x = 0; x < screenWidth; x ++)
+	{
+		for(int y = 0; y < screenHeight; y++)
+		{
+			pixels[y*screenWidth + x] = f[i];
+			i++;
+		}
+	}
+	
+	SDL_BlitSurface(screen,NULL,screen,NULL);
+
+	return 1;
+}
+*/
+/*
+SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+SDL_RenderDrawPoint(renderer, 100, 100);
+SDL_RenderPresent(renderer);
+*/
+
+
+
+
 
